@@ -103,8 +103,14 @@ def run( application ):
 	startCron()
 
 	'''
-	Does not work with UnqLite. Unqlite cant handle multi process transactions
-
+	Unqlite cant handle multi process transactions, so we have to use simple_server?
+	#httpServer = simple_server.make_server( host = '127.0.0.1', port = 8080, app=application)
+	#try:
+	#	httpServer.serve_forever()
+	#except KeyboardInterrupt:
+	#	httpServer.server_close()
+	
+	'''
 
 	options = {
 		'bind': '%s:%s' % ('127.0.0.1', '8080'),
@@ -112,13 +118,9 @@ def run( application ):
 	}
 
 	gunicornServer(application, options).run()
-	'''
 
-	httpServer = simple_server.make_server( host = '127.0.0.1', port = 8080, app=application)
-	try:
-		httpServer.serve_forever()
-	except KeyboardInterrupt:
-		httpServer.server_close()
+
+
 
 # ------------------------------------------------------------------
 # Static routes

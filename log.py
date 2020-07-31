@@ -17,7 +17,7 @@ __author__ = "Andreas H. Kelch"
 # along with this library; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import logging
+import logging, os
 from colorlog import ColoredFormatter
 
 DEFAULT = '\033[m'
@@ -48,7 +48,24 @@ if isDebugMode:
 else:
     LOG_LEVEL = logging.INFO
 
-formatter = ColoredFormatter('--------------------------\n%(asctime)s,%(msecs)d %(levelname)-8s [%(pathname)s:%(lineno)d]%(log_color)s %(message)s%(reset)s',log_colors = colors)
+
+class xenoFormatter(ColoredFormatter):
+
+    def format(self, record):
+        if 'pathname' in record.__dict__.keys():
+            # truncate the pathname
+            if "/deploy" in record.pathname:
+                pathname = "."+record.pathname.split("/deploy") [1]
+            else:
+                pathname = record.pathname
+                #pathname = os.path.basename(record.pathname)
+                #if len(pathname) > 20:
+                #    filename = '{}~{}'.format(pathname[:3], pathname[-16:])
+            record.pathname = pathname
+        return super(xenoFormatter, self).format(record)
+
+
+formatter = xenoFormatter('--------------------------\n%(asctime)s,%(msecs)d %(levelname)-8s [%(pathname)s:%(lineno)d]%(log_color)s %(message)s%(reset)s',log_colors = colors)
 stream = logging.StreamHandler()
 stream.setLevel(LOG_LEVEL)
 stream.setFormatter(formatter)
