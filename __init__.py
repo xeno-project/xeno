@@ -18,12 +18,37 @@ __author__ = "Andreas H. Kelch"
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import os, logging
-#from paste import httpserver
 from viur.xeno import conf as xeno_conf
+import gunicorn.app.base
 from wsgiref import simple_server
 
-
 from viur.xeno.databases import unqlite_adapter as datastore
+
+
+#BaseEncoding.base64Url().omitPadding().encode(toPb().toByteArray());
+#partition_id+%7B%0A++project_id%3A+%22my-project%22%0A++namespace_id%3A+%22MyNamespace%22%0A%7D%0Apath+%7B%0A++kind%3A+%22MyEntity%22%0A++name%3A+%22MyKey%22%0A%7D%0A
+
+
+
+class gunicornServer(gunicorn.app.base.BaseApplication):
+
+	def __init__(self, app, options=None):
+		self.options = options or {}
+		self.application = app
+		super().__init__()
+
+	def load_config(self):
+		config = {
+			key: value for key, value in self.options.items()
+				if key in self.cfg.settings and value is not None}
+		for key, value in config.items():
+			self.cfg.set(key.lower(), value)
+
+	def load(self):
+		return self.application
+
+
+
 
 def loadConfiguration():
 	os.environ[ 'GAE_ENV' ] = "xeno"
@@ -68,29 +93,32 @@ def setup():
 	#client.get(key)
 
 
-
-
-
-
-
-
-
-
 def run( application ):
 	'''
 	stuff to run on startup
 	called from app.py
 	:return:
 	'''
-	httpServer = simple_server.make_server( host = '127.0.0.1', port = 8080,app=application)
+
+	startCron()
+
+	'''
+	Does not work with UnqLite. Unqlite cant handle multi process transactions
+
+
+	options = {
+		'bind': '%s:%s' % ('127.0.0.1', '8080'),
+		'workers': 1,
+	}
+
+	gunicornServer(application, options).run()
+	'''
+
+	httpServer = simple_server.make_server( host = '127.0.0.1', port = 8080, app=application)
 	try:
 		httpServer.serve_forever()
 	except KeyboardInterrupt:
 		httpServer.server_close()
-
-
-	#httpserver.serve( application, host = '127.0.0.1', port = 8080 )
-
 
 # ------------------------------------------------------------------
 # Static routes
@@ -149,8 +177,30 @@ def initScheduler():
 def startCron():
 	from viur.core import conf
 	from datetime import datetime, timedelta
+	from urllib.request import urlopen
+	import requests
+
+
+
+
+	def callCron(*args,**kwargs):
+		# whitelist localhost
+		#global _appengineServiceIPs
+		#_appengineServiceIPs.extend(["localhost", "127.0.0.1"])
+
+		taskurl = "http://localhost:8080/_tasks/cron"
+		headers = {"X-Appengine-Cron":"1",
+				   "X_APPENGINE_USER_IP":"10.0.0.1"}
+
+		resp = requests.post(taskurl,headers=headers)
+		#logging.error(resp)
+
+		#with urlopen("http://localhost:8080/_tasks/cron") as response:
+		#	logging.error(response)
+
+
 	mainTask = conf[ "xeno.scheduler" ].add_job(
-			conf[ "viur.mainResolver" ][ "_tasks" ][ "cron" ],
+			callCron,
 			'cron',
 			minute = '*/5',
 			next_run_time = datetime.now() + timedelta( seconds = 1 ) )

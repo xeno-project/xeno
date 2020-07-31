@@ -21,9 +21,32 @@ __author__ = "Andreas H. Kelch"
 import logging
 import operator
 from unqlite import UnQLite
+from datetime import datetime
 from viur.xeno.databases.unqlite_adapter import Entity,Key,Query
+from functools import partial
+#from viur.core import utils
 
 __db__ = UnQLite("database.udb")
+logging.error("DB INIT ")
+
+'''
+base,string,color,email,key,password,selectOne,text
+date
+file,hierarchy,relational,record,treedir,treeitem,user
+numeric
+selectMulti
+
+
+
+
+
+
+'''
+
+
+
+#_generateNewId = partial(utils.generateRandomString, length=20)
+
 
 
 
@@ -44,7 +67,7 @@ def buildfilter(filterlist):
 			"in": operator.contains
 		}
 
-		if isinstance(dbval,list) and oper=="=":
+		if isinstance(dbval,list) and oper == "=":
 			oper = "in"
 
 		return ops[oper](dbval,filterval)
@@ -85,8 +108,15 @@ def buildfilter(filterlist):
 
 def dbobj_to_Entity(kind,dbobj) -> Entity:
 	for k,v in dbobj.items():
+
 		if isinstance(v,bytes) and k not in ["password"]:
 			dbobj[k] = v.decode()
+
+			try:
+				dbobj[k] = datetime.strptime(dbobj[k], "%Y-%m-%d %H:%M:%S")
+			except ValueError:
+				pass
+
 		elif isinstance(v, list):
 			nlist = []
 			for val in v:
@@ -94,11 +124,18 @@ def dbobj_to_Entity(kind,dbobj) -> Entity:
 					nlist.append(val.decode())
 			dbobj[k] = nlist
 
+	#logging.error(dbobj)
 	key = Key(kind, dbobj["__key__"])
 	entity = Entity(key = key)
 	del dbobj["__key__"]
 	entity.update(dbobj)
 	return entity
+
+def Entity_to_dbobj(Entity):
+	for k, v in Entity.items():
+		if isinstance(v,datetime):
+			Entity[k] = v.strftime("%Y-%m-%d %H:%M:%S")
+	return Entity
 
 def connect():
 	pass
@@ -109,6 +146,7 @@ def put(entity:Entity):
 	collection.create()
 
 	key = entity.key
+	entity = Entity_to_dbobj(entity)
 	raw_entity = dict(entity)
 	raw_entity["__key__"] = str(key.id_or_name) #unqlite doesnot support presetting __id :(
 
@@ -119,9 +157,7 @@ def put(entity:Entity):
 		collection.update(entities[0]["__id"],raw_entity) #update
 
 
-
 def get_multi(keys:[Key]):
-	#logging.error("GET")
 	entities = []
 
 	if not keys:
@@ -129,7 +165,7 @@ def get_multi(keys:[Key]):
 
 	for key in keys:
 		kind = key.kind
-		dbkey = key.id_or_name.encode()
+		dbkey = str(key.id_or_name).encode()
 
 		collection = __db__.collection(kind) #ensure that collection exists
 		collection.create()
@@ -137,6 +173,7 @@ def get_multi(keys:[Key]):
 		result = collection.filter(lambda entity: entity["__key__"] == dbkey)
 		if result:
 			entities.append(dbobj_to_Entity(kind,result[0]))
+	#logging.error(entities)
 	return entities
 
 def delete(key:Key):
@@ -158,7 +195,10 @@ def query(query:Query):
 	logging.error(query.filters)
 	logging.error(query.kind)
 	logging.error(query.order)
+	logging.error(dir(query))
 	'''
+
+
 	collection = __db__.collection(query.kind)  # ensure that collection exists
 	collection.create()
 
@@ -173,8 +213,11 @@ def query(query:Query):
 	if query.order:
 		pass
 
-	entities = [dbobj_to_Entity(query.kind,e) for e in entities]
-	#logging.error(entities)
+	if query.keys_only:
+		entities = [dbobj_to_Entity(query.kind, e).key for e in entities]
+	else:
+		entities = [dbobj_to_Entity(query.kind,e) for e in entities]
+		#logging.error(entities)
 	return entities
 
 def transaction_start():
@@ -185,7 +228,6 @@ def transaction_commit():
 
 def transaction_rollback():
 	__db__.rollback()
-
 
 def get(key): #not used
 	pass
