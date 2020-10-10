@@ -16,8 +16,9 @@ __author__ = "Andreas H. Kelch"
 # You should have received a copy of the GNU Lesser General Public License
 # along with this library; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
 #from .unqlite_adapter import unqlite as dbinterface #Here we register our used database
-from .mongodb import mdb as dbinterface
+from .mongodb import mdb as dbinterface #use mongddb as dbinterface
 
 
 

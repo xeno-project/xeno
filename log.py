@@ -42,7 +42,7 @@ colors = {
     "EXCEPTION":"green"
 }
 
-isDebugMode = False
+isDebugMode = True
 if isDebugMode:
     LOG_LEVEL = logging.DEBUG
 else:

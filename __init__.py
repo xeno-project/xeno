@@ -20,18 +20,12 @@ __author__ = "Andreas H. Kelch"
 import os, logging
 from viur.xeno import conf as xeno_conf
 import gunicorn.app.base
-from wsgiref import simple_server
-
 from viur.xeno.databases import unqlite_adapter as datastore
 
-
-#BaseEncoding.base64Url().omitPadding().encode(toPb().toByteArray());
-#partition_id+%7B%0A++project_id%3A+%22my-project%22%0A++namespace_id%3A+%22MyNamespace%22%0A%7D%0Apath+%7B%0A++kind%3A+%22MyEntity%22%0A++name%3A+%22MyKey%22%0A%7D%0A
-
-
-
 class gunicornServer(gunicorn.app.base.BaseApplication):
-
+	'''
+		custom webserver
+	'''
 	def __init__(self, app, options=None):
 		self.options = options or {}
 		self.application = app
@@ -46,9 +40,6 @@ class gunicornServer(gunicorn.app.base.BaseApplication):
 
 	def load(self):
 		return self.application
-
-
-
 
 def loadConfiguration():
 	os.environ[ 'GAE_ENV' ] = "xeno"
@@ -74,25 +65,6 @@ def setup():
 	'''
 	pass
 
-	#db test
-	#logging.error("DB TEST")
-
-	#from viur.xeno.databases import unqlite_adapter
-	#client = unqlite_adapter.Client()
-
-	#key = client.key('testkind',1234)
-	#t1 = unqlite_adapter.Entity(key=key)
-	#t1["name"] = "test1"
-
-
-	#batch = client.batch()
-	#batch.begin()
-	#batch.put(t1)
-	#batch.commit()
-
-	#client.get(key)
-
-
 def run( application ):
 	'''
 	stuff to run on startup
@@ -102,25 +74,14 @@ def run( application ):
 
 	startCron()
 
-	'''
-	Unqlite cant handle multi process transactions, so we have to use simple_server?
-	#httpServer = simple_server.make_server( host = '127.0.0.1', port = 8080, app=application)
-	#try:
-	#	httpServer.serve_forever()
-	#except KeyboardInterrupt:
-	#	httpServer.server_close()
-	
-	'''
-
 	options = {
-		'bind': '%s:%s' % ('127.0.0.1', '8080'),
+		'bind': xeno_conf.conf["xeno.application.host"],
 		'workers': 1,
+		'threads': 2,
+		'reload' : True
 	}
 
 	gunicornServer(application, options).run()
-
-
-
 
 # ------------------------------------------------------------------
 # Static routes
@@ -135,6 +96,13 @@ def static_routes( req, environ, start_response ):
 	'''
 	from webob import static as webobstatic
 	from viur.core import conf
+
+	if req.path_info.startswith("/xeno/simplestorage"):
+		from viur.xeno.files import fileUpload
+		if "key" in req.params and "file" in req.params:
+			fileUpload(req.params["key"],req.params["file"])
+		else:
+			raise
 
 	for staticpath, staticfolder in conf[ "xeno.application.static_dirs" ].items():
 
@@ -153,7 +121,6 @@ def static_routes( req, environ, start_response ):
 
 	return False
 
-
 # ------------------------------------------------------------------
 # Tasks
 # ------------------------------------------------------------------
@@ -161,6 +128,8 @@ def initScheduler():
 	from apscheduler.schedulers.background import BackgroundScheduler
 	from apscheduler.executors.pool import ProcessPoolExecutor
 
+	logging.getLogger( "apscheduler.scheduler" ).setLevel( logging.WARNING )
+	logging.getLogger( 'apscheduler.executors.default' ).propagate = False
 	jobstores = { }  # dont store any task data
 	executors = {
 			'default'    : { 'type': 'threadpool', 'max_workers': 20 },
@@ -174,32 +143,23 @@ def initScheduler():
 	scheduler.configure( jobstores = jobstores, executors = executors, job_defaults = job_defaults, timezone = "Europe/Berlin" )
 	scheduler.start()
 	xeno_conf.conf[ "xeno.scheduler" ] = scheduler
-
+	logging.warning("SCHEDULER STARTED")
 
 def startCron():
 	from viur.core import conf
 	from datetime import datetime, timedelta
-	from urllib.request import urlopen
 	import requests
-
-
-
 
 	def callCron(*args,**kwargs):
 		# whitelist localhost
 		#global _appengineServiceIPs
 		#_appengineServiceIPs.extend(["localhost", "127.0.0.1"])
 
-		taskurl = "http://localhost:8080/_tasks/cron"
+		taskurl = "http://%s/_tasks/cron"%conf["xeno.application.host"]
 		headers = {"X-Appengine-Cron":"1",
 				   "X_APPENGINE_USER_IP":"10.0.0.1"}
 
 		resp = requests.post(taskurl,headers=headers)
-		#logging.error(resp)
-
-		#with urlopen("http://localhost:8080/_tasks/cron") as response:
-		#	logging.error(response)
-
 
 	mainTask = conf[ "xeno.scheduler" ].add_job(
 			callCron,
@@ -211,13 +171,15 @@ def callDeferred_hook( func, args, kwargs ):
 	from datetime import datetime, timedelta
 	from viur.core import conf
 
-	rundate = datetime.now() + timedelta( seconds = 3 )  # 3 seconds delay
+	#rundate = datetime.now() + timedelta( seconds = 30 )  # 3 seconds delay
+	#logging.error(conf[ "xeno.scheduler" ].print_jobs())
 
 	job = conf[ "xeno.scheduler" ].add_job( func,
-											id = "%s.%s" % (func.__module__, func.__name__),
+											#id = "%s.%s" % (func.__module__, func.__name__),
 											args = args,
 											kwargs = kwargs,
-											trigger = "date",
-											run_date = rundate )
-
+											#trigger = "date",
+											#run_date = rundate
+											)
 	return job
+

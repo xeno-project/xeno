@@ -36,6 +36,8 @@ def loadYaml():
 	projectdata = loadYamlFile("./project.yaml")
 	if projectdata:
 		conf["xeno.application.projectID"] = ( "_", projectdata["application"] )
+		conf["xeno.application.databaseConnection"] = (projectdata["database_ip"], projectdata["database_port"])
+		conf["xeno.application.host"] = projectdata["server_ip"]
 	else:
 		conf["xeno.application.projectID"] = None
 		logging.critical("project.yaml needed!")
