@@ -26,4 +26,4 @@ GNU Lesser General Public License v3.0 - See `the LICENSE`_ for more information
 .. _unqlite: https://github.com/coleifer/unqlite-python
 .. _gunicorn: https://github.com/benoitc/gunicorn
 .. _apscheduler: https://github.com/agronholm/apscheduler
-.. _mongodb https://github.com/mongodb/mongo-python-driver
+.. _mongodb: https://github.com/mongodb/mongo-python-driver
