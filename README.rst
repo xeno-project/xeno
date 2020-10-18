@@ -6,13 +6,11 @@ The Xeno Connector connects the ViUR framework with various open source alternat
 It uses:
  - `gunicorn`_ as web server
  - `apscheduler`_ for deferred tasks and cron
- - `unqlite`_ as simple embeddable NoSQL database
+ - `mongodb`_ as database
 
 more databases are planned:
- - mongodb
+ - unqlite
  - arangodb
-
-File handling is totally broken at the moment
 
 WARNING - WIP
 --------------------
@@ -28,3 +26,4 @@ GNU Lesser General Public License v3.0 - See `the LICENSE`_ for more information
 .. _unqlite: https://github.com/coleifer/unqlite-python
 .. _gunicorn: https://github.com/benoitc/gunicorn
 .. _apscheduler: https://github.com/agronholm/apscheduler
+.. _mongodb https://github.com/mongodb/mongo-python-driver
